@@ -1,0 +1,655 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="theme-color" content="#0d0d0d"/>
+<title>Focus Matrix</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700&family=Inter:wght@300;400;500&display=swap');
+
+:root {
+  --bg: #0d0d0d;
+  --surface: #181818;
+  --surface2: #222;
+  --surface3: #2a2a2a;
+  --border: rgba(255,255,255,0.07);
+  --border2: rgba(255,255,255,0.13);
+  --text: #f2efe9;
+  --muted: rgba(242,239,233,0.42);
+  --faint: rgba(242,239,233,0.08);
+  --q1: #ff5c3a; --q1l: rgba(255,92,58,0.14); --q1b: rgba(255,92,58,0.32);
+  --q2: #3d9bff; --q2l: rgba(61,155,255,0.12); --q2b: rgba(61,155,255,0.28);
+  --q3: #f0c040; --q3l: rgba(240,192,64,0.11); --q3b: rgba(240,192,64,0.26);
+  --q4: #6e6e6e; --q4l: rgba(110,110,110,0.1); --q4b: rgba(110,110,110,0.22);
+  --nav-h: 70px;
+  --safe-b: env(safe-area-inset-bottom, 0px);
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+html, body {
+  height: 100%; width: 100%; overflow: hidden;
+  background: var(--bg); color: var(--text);
+  font-family: 'Inter', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+#app {
+  display: flex; flex-direction: column;
+  height: 100%; max-width: 430px;
+  margin: 0 auto; position: relative; overflow: hidden;
+}
+
+.status-bar { height: env(safe-area-inset-top, 12px); background: var(--bg); flex-shrink: 0; }
+
+.screens { flex: 1; position: relative; overflow: hidden; }
+
+.screen {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column;
+  opacity: 0; pointer-events: none;
+  transform: translateY(10px);
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+.screen.active { opacity: 1; pointer-events: all; transform: translateY(0); }
+
+.topbar {
+  padding: 16px 20px 8px;
+  display: flex; align-items: center; justify-content: space-between;
+  flex-shrink: 0;
+}
+
+.page-title {
+  font-family: 'Syne', sans-serif;
+  font-size: 24px; font-weight: 700; letter-spacing: -0.5px;
+}
+
+.page-sub { font-size: 12px; color: var(--muted); margin-top: 1px; }
+
+/* OVERVIEW */
+.scroll-area { flex: 1; overflow-y: auto; padding: 6px 16px 16px; }
+.scroll-area::-webkit-scrollbar { display: none; }
+
+.stat-row {
+  display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; margin-bottom: 14px;
+}
+
+.stat-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 14px; padding: 12px 10px; text-align: center;
+}
+
+.stat-num { font-family: 'Syne',sans-serif; font-size: 26px; font-weight: 700; line-height: 1; }
+.stat-lbl { font-size: 11px; color: var(--muted); margin-top: 3px; }
+
+.q-card {
+  background: var(--surface); border-radius: 16px;
+  border: 1px solid var(--border); margin-bottom: 10px;
+  overflow: hidden; cursor: pointer; transition: background 0.15s;
+}
+.q-card:active { background: var(--surface2); }
+
+.q-card-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 16px 10px;
+}
+
+.q-card-left { display: flex; align-items: center; gap: 11px; }
+
+.q-icon {
+  width: 38px; height: 38px; border-radius: 11px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 17px; flex-shrink: 0;
+}
+
+.q1-c .q-icon { background: var(--q1l); }
+.q2-c .q-icon { background: var(--q2l); }
+.q3-c .q-icon { background: var(--q3l); }
+.q4-c .q-icon { background: var(--q4l); }
+
+.q-card-name { font-family:'Syne',sans-serif; font-size:15px; font-weight:600; }
+.q1-c .q-card-name { color: var(--q1); }
+.q2-c .q-card-name { color: var(--q2); }
+.q3-c .q-card-name { color: var(--q3); }
+.q4-c .q-card-name { color: var(--q4); }
+.q-card-sub { font-size:11px; color:var(--muted); margin-top:1px; }
+
+.q-badge { font-size:12px; font-weight:500; padding:3px 10px; border-radius:20px; }
+.q1-c .q-badge { background:var(--q1l); color:var(--q1); }
+.q2-c .q-badge { background:var(--q2l); color:var(--q2); }
+.q3-c .q-badge { background:var(--q3l); color:var(--q3); }
+.q4-c .q-badge { background:var(--q4l); color:var(--q4); }
+
+.q-preview { padding:0 16px 14px; display:flex; flex-direction:column; gap:5px; }
+
+.q-preview-item {
+  font-size:13px; color:var(--muted);
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  display:flex; align-items:center; gap:7px;
+}
+
+.q-preview-dot {
+  width:5px; height:5px; border-radius:50%; flex-shrink:0;
+}
+
+.q-preview-empty { font-size:12px; color:var(--muted); opacity:0.5; font-style:italic; }
+
+/* DETAIL */
+#screen-detail .topbar { padding-top: 10px; }
+
+.back-btn {
+  display:flex; align-items:center; gap:5px;
+  font-size:14px; color:var(--muted); cursor:pointer; padding:4px 0;
+}
+
+.back-btn svg { width:16px; height:16px; }
+
+.q-detail-header {
+  display:flex; align-items:center; gap:13px;
+  padding:2px 20px 14px; flex-shrink:0;
+}
+
+.q-detail-icon {
+  width:46px; height:46px; border-radius:14px;
+  display:flex; align-items:center; justify-content:center; font-size:22px;
+}
+
+.q-detail-name { font-family:'Syne',sans-serif; font-size:21px; font-weight:700; }
+.q-detail-sub { font-size:12px; color:var(--muted); margin-top:2px; }
+
+.task-scroll {
+  flex:1; overflow-y:auto; padding:4px 16px 90px;
+  display:flex; flex-direction:column; gap:8px;
+}
+.task-scroll::-webkit-scrollbar { display:none; }
+
+.task-item {
+  background:var(--surface); border:1px solid var(--border);
+  border-radius:14px; padding:13px 14px;
+  display:flex; align-items:flex-start; gap:12px;
+  animation: slideIn 0.18s ease;
+}
+
+@keyframes slideIn {
+  from { opacity:0; transform:translateY(5px); }
+  to   { opacity:1; transform:translateY(0); }
+}
+
+.task-item.done { opacity:0.42; }
+
+.check-ring {
+  width:22px; height:22px; border-radius:50%;
+  border:1.8px solid var(--border2);
+  flex-shrink:0; cursor:pointer; margin-top:1px;
+  display:flex; align-items:center; justify-content:center;
+  transition:all 0.15s;
+}
+.check-ring:active { transform:scale(0.88); }
+.check-ring svg { display:none; width:11px; height:11px; }
+.check-ring.checked svg { display:block; }
+.check-ring.checked { border-color:transparent; background:var(--faint); }
+
+.task-item-text {
+  flex:1; font-size:14px; line-height:1.45; color:var(--text); padding-top:1px;
+}
+.task-item.done .task-item-text { text-decoration:line-through; }
+
+.task-del-btn {
+  width:28px; height:28px; border-radius:50%;
+  background:none; border:none;
+  color:var(--muted); font-size:20px; line-height:1;
+  cursor:pointer; opacity:0; flex-shrink:0;
+  display:flex; align-items:center; justify-content:center;
+  transition:opacity 0.15s, color 0.15s;
+}
+.task-item:hover .task-del-btn { opacity:1; }
+.task-item:active .task-del-btn { opacity:1; }
+.task-del-btn:hover { color:#ff5c5c; }
+
+.empty-state {
+  flex:1; display:flex; flex-direction:column;
+  align-items:center; justify-content:center;
+  gap:10px; color:var(--muted); padding-bottom:80px;
+}
+.empty-state-icon { font-size:38px; opacity:0.25; }
+.empty-state-text { font-size:14px; }
+
+/* BOTTOM NAV */
+.bottom-nav {
+  height: var(--nav-h);
+  padding-bottom: var(--safe-b);
+  background: rgba(16,16,16,0.94);
+  border-top: 1px solid var(--border);
+  display:flex; align-items:flex-start; justify-content:space-around;
+  padding-top:8px; flex-shrink:0;
+  backdrop-filter:blur(20px); -webkit-backdrop-filter:blur(20px);
+  position:relative; z-index:10;
+}
+
+.nav-item {
+  display:flex; flex-direction:column; align-items:center; gap:4px;
+  cursor:pointer; padding:2px 10px; flex:1; transition:opacity 0.15s;
+}
+
+.nav-icon {
+  width:28px; height:28px;
+  display:flex; align-items:center; justify-content:center;
+  border-radius:8px; transition:background 0.15s;
+}
+
+.nav-item.active .nav-icon { background:var(--faint); }
+
+.nav-label { font-size:10px; color:var(--muted); transition:color 0.15s; letter-spacing:0.02em; }
+.nav-item.active .nav-label { color:var(--text); }
+
+.nav-item svg {
+  width:18px; height:18px; stroke:var(--muted); fill:none;
+  stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round;
+  transition:stroke 0.15s;
+}
+.nav-item.active svg { stroke:var(--text); }
+
+/* FAB */
+.fab {
+  position:absolute;
+  bottom: calc(var(--nav-h) + 14px + var(--safe-b));
+  right:20px;
+  width:54px; height:54px; border-radius:50%;
+  background:var(--text); color:#0d0d0d;
+  font-size:28px; font-weight:300;
+  border:none; cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+  box-shadow:0 4px 20px rgba(0,0,0,0.6);
+  z-index:20; transition:transform 0.2s cubic-bezier(0.34,1.56,0.64,1), background 0.15s;
+}
+.fab:active { transform:scale(0.92) !important; }
+.fab.open { transform:rotate(45deg); }
+
+/* SHEET */
+.sheet-overlay {
+  position:absolute; inset:0;
+  background:rgba(0,0,0,0.55);
+  z-index:30; opacity:0; pointer-events:none;
+  transition:opacity 0.25s;
+  backdrop-filter:blur(5px); -webkit-backdrop-filter:blur(5px);
+}
+.sheet-overlay.show { opacity:1; pointer-events:all; }
+
+.sheet {
+  position:absolute; bottom:0; left:0; right:0;
+  background:var(--surface);
+  border-radius:22px 22px 0 0;
+  border-top:1px solid var(--border2);
+  padding:0 20px;
+  padding-bottom:calc(20px + var(--safe-b));
+  z-index:31;
+  transform:translateY(100%);
+  transition:transform 0.3s cubic-bezier(0.32,0.72,0,1);
+}
+.sheet.show { transform:translateY(0); }
+
+.sheet-handle {
+  width:36px; height:4px; background:var(--border2);
+  border-radius:2px; margin:12px auto 18px;
+}
+
+.sheet-title { font-family:'Syne',sans-serif; font-size:17px; font-weight:700; margin-bottom:16px; }
+
+.sheet-input {
+  width:100%; background:var(--surface2);
+  border:1px solid var(--border2); border-radius:12px;
+  color:var(--text); font-family:'Inter',sans-serif;
+  font-size:15px; padding:13px 15px; outline:none;
+  transition:border-color 0.2s; margin-bottom:14px;
+}
+.sheet-input:focus { border-color:rgba(255,255,255,0.25); }
+.sheet-input::placeholder { color:var(--muted); }
+
+.toggle-row { display:flex; gap:8px; margin-bottom:16px; }
+
+.toggle-chip {
+  flex:1; padding:10px 8px; border-radius:12px;
+  border:1px solid var(--border); background:var(--surface2);
+  color:var(--muted); font-family:'Inter',sans-serif;
+  font-size:13px; cursor:pointer; text-align:center; transition:all 0.15s;
+}
+.toggle-chip.on-urgent   { border-color:var(--q1b); color:var(--q1); background:var(--q1l); }
+.toggle-chip.off-urgent  { border-color:var(--q2b); color:var(--q2); background:var(--q2l); }
+.toggle-chip.on-important  { border-color:var(--q1b); color:var(--q1); background:var(--q1l); }
+.toggle-chip.off-important { border-color:var(--q4b); color:var(--q4); background:var(--q4l); }
+
+.dest-hint {
+  font-size:12px; color:var(--muted); text-align:center;
+  margin-bottom:14px; min-height:18px;
+}
+
+.sheet-add-btn {
+  width:100%; padding:14px; border-radius:14px; border:none;
+  background:var(--text); color:#0d0d0d;
+  font-family:'Syne',sans-serif; font-size:15px; font-weight:700;
+  cursor:pointer; transition:opacity 0.15s, transform 0.1s;
+}
+.sheet-add-btn:active { transform:scale(0.98); opacity:0.88; }
+
+/* TOAST */
+.toast {
+  position:absolute;
+  bottom:calc(var(--nav-h) + 80px);
+  left:50%; transform:translateX(-50%) translateY(6px);
+  background:var(--surface3); border:1px solid var(--border2);
+  color:var(--text); padding:9px 18px; border-radius:30px;
+  font-size:13px; opacity:0; pointer-events:none;
+  transition:all 0.22s; white-space:nowrap; z-index:50;
+}
+.toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="status-bar"></div>
+
+  <div class="screens">
+    <!-- OVERVIEW -->
+    <div class="screen active" id="screen-overview">
+      <div class="topbar">
+        <div>
+          <div class="page-title">Focus<span style="color:var(--q1)">.</span></div>
+          <div class="page-sub">Eisenhower Matrix</div>
+        </div>
+      </div>
+      <div class="scroll-area">
+        <div class="stat-row">
+          <div class="stat-card"><div class="stat-num" id="s-total">0</div><div class="stat-lbl">total</div></div>
+          <div class="stat-card"><div class="stat-num" id="s-done">0</div><div class="stat-lbl">done</div></div>
+          <div class="stat-card"><div class="stat-num" id="s-do">0</div><div class="stat-lbl">do first</div></div>
+        </div>
+        <div id="q-cards"></div>
+      </div>
+    </div>
+
+    <!-- DETAIL -->
+    <div class="screen" id="screen-detail">
+      <div class="topbar">
+        <div class="back-btn" onclick="showOverview()">
+          <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
+          Back
+        </div>
+      </div>
+      <div class="q-detail-header" id="detail-header"></div>
+      <div class="task-scroll" id="detail-tasks"></div>
+    </div>
+  </div>
+
+  <!-- BOTTOM NAV -->
+  <nav class="bottom-nav">
+    <div class="nav-item active" id="nav-home" onclick="showOverview()">
+      <div class="nav-icon">
+        <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
+      </div>
+      <span class="nav-label">Overview</span>
+    </div>
+    <div class="nav-item" id="nav-q1" onclick="openQ('q1')">
+      <div class="nav-icon">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 15"/></svg>
+      </div>
+      <span class="nav-label">Do first</span>
+    </div>
+    <div class="nav-item" id="nav-q2" onclick="openQ('q2')">
+      <div class="nav-icon">
+        <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+      </div>
+      <span class="nav-label">Schedule</span>
+    </div>
+    <div class="nav-item" id="nav-q3" onclick="openQ('q3')">
+      <div class="nav-icon">
+        <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      </div>
+      <span class="nav-label">Delegate</span>
+    </div>
+    <div class="nav-item" id="nav-q4" onclick="openQ('q4')">
+      <div class="nav-icon">
+        <svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>
+      </div>
+      <span class="nav-label">Eliminate</span>
+    </div>
+  </nav>
+
+  <button class="fab" id="fab" onclick="toggleSheet()">+</button>
+
+  <div class="sheet-overlay" id="overlay" onclick="closeSheet()"></div>
+  <div class="sheet" id="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-title">New task</div>
+    <input class="sheet-input" id="task-input" type="text" placeholder="What needs to be done?"/>
+    <div class="toggle-row">
+      <button class="toggle-chip on-urgent" id="chip-u" onclick="toggleUrgent()">Urgent</button>
+      <button class="toggle-chip on-important" id="chip-i" onclick="toggleImportant()">Important</button>
+    </div>
+    <div class="dest-hint" id="dest-hint">→ Do first</div>
+    <button class="sheet-add-btn" onclick="addTask()">Add task</button>
+  </div>
+
+  <div class="toast" id="toast"></div>
+</div>
+
+<script>
+const META = {
+  q1:{ name:'Do first',  sub:'urgent · important',         color:'var(--q1)', bg:'var(--q1l)', icon:'⚡' },
+  q2:{ name:'Schedule',  sub:'not urgent · important',     color:'var(--q2)', bg:'var(--q2l)', icon:'📅' },
+  q3:{ name:'Delegate',  sub:'urgent · not important',     color:'var(--q3)', bg:'var(--q3l)', icon:'🤝' },
+  q4:{ name:'Eliminate', sub:'not urgent · not important', color:'var(--q4)', bg:'var(--q4l)', icon:'🗑' },
+};
+
+const NAV_MAP = { q1:'nav-q1', q2:'nav-q2', q3:'nav-q3', q4:'nav-q4' };
+
+let tasks = { q1:[], q2:[], q3:[], q4:[] };
+let isUrgent = true, isImportant = true;
+let currentQ = null;
+
+/* ── STORAGE ── */
+function load() {
+  try { const s = localStorage.getItem('focus-matrix'); if(s) tasks = JSON.parse(s); } catch(e){}
+  renderOverview(); updateStats();
+}
+
+function save() {
+  try { localStorage.setItem('focus-matrix', JSON.stringify(tasks)); } catch(e){}
+}
+
+function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2); }
+
+/* ── QUADRANT ── */
+function getQ() {
+  if( isUrgent &&  isImportant) return 'q1';
+  if(!isUrgent &&  isImportant) return 'q2';
+  if( isUrgent && !isImportant) return 'q3';
+  return 'q4';
+}
+
+/* ── NAVIGATION ── */
+function showOverview() {
+  setNav('nav-home');
+  switchScreen('screen-overview');
+  currentQ = null;
+  renderOverview(); updateStats();
+}
+
+function openQ(q) {
+  currentQ = q;
+  setNav(NAV_MAP[q]);
+  renderDetail(q);
+  switchScreen('screen-detail');
+}
+
+function setNav(id) {
+  document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+function switchScreen(id) {
+  document.querySelectorAll('.screen').forEach(el => el.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+/* ── SHEET ── */
+function toggleSheet() {
+  document.getElementById('sheet').classList.contains('show') ? closeSheet() : openSheet();
+}
+
+function openSheet() {
+  document.getElementById('sheet').classList.add('show');
+  document.getElementById('overlay').classList.add('show');
+  document.getElementById('fab').classList.add('open');
+  updateDestHint();
+  setTimeout(() => document.getElementById('task-input').focus(), 320);
+}
+
+function closeSheet() {
+  document.getElementById('sheet').classList.remove('show');
+  document.getElementById('overlay').classList.remove('show');
+  document.getElementById('fab').classList.remove('open');
+}
+
+function toggleUrgent() {
+  isUrgent = !isUrgent;
+  const c = document.getElementById('chip-u');
+  c.textContent = isUrgent ? 'Urgent' : 'Not urgent';
+  c.className = 'toggle-chip ' + (isUrgent ? 'on-urgent' : 'off-urgent');
+  updateDestHint();
+}
+
+function toggleImportant() {
+  isImportant = !isImportant;
+  const c = document.getElementById('chip-i');
+  c.textContent = isImportant ? 'Important' : 'Not important';
+  c.className = 'toggle-chip ' + (isImportant ? 'on-important' : 'off-important');
+  updateDestHint();
+}
+
+function updateDestHint() {
+  document.getElementById('dest-hint').textContent = '→ ' + META[getQ()].name;
+}
+
+/* ── ADD TASK ── */
+function addTask() {
+  const inp = document.getElementById('task-input');
+  const text = inp.value.trim();
+  if(!text) { inp.focus(); return; }
+  const q = getQ();
+  tasks[q].push({ id:uid(), text, done:false });
+  inp.value = '';
+  save();
+  if(currentQ === q) renderDetail(q);
+  renderOverview(); updateStats();
+  closeSheet();
+  showToast('Added to ' + META[q].name);
+}
+
+/* ── RENDER OVERVIEW ── */
+function renderOverview() {
+  const c = document.getElementById('q-cards');
+  c.innerHTML = '';
+  ['q1','q2','q3','q4'].forEach(q => {
+    const m = META[q];
+    const preview = tasks[q].filter(t=>!t.done).slice(0,3);
+    const div = document.createElement('div');
+    div.className = 'q-card ' + q + '-c';
+    div.onclick = () => openQ(q);
+    div.innerHTML = `
+      <div class="q-card-head">
+        <div class="q-card-left">
+          <div class="q-icon">${m.icon}</div>
+          <div>
+            <div class="q-card-name">${m.name}</div>
+            <div class="q-card-sub">${m.sub}</div>
+          </div>
+        </div>
+        <span class="q-badge">${tasks[q].length}</span>
+      </div>
+      <div class="q-preview">
+        ${preview.length
+          ? preview.map(t=>`<div class="q-preview-item"><span class="q-preview-dot" style="background:${m.color}"></span>${esc(t.text)}</div>`).join('')
+          : '<div class="q-preview-empty">No tasks yet</div>'
+        }
+      </div>`;
+    c.appendChild(div);
+  });
+}
+
+/* ── RENDER DETAIL ── */
+function renderDetail(q) {
+  const m = META[q];
+  document.getElementById('detail-header').innerHTML = `
+    <div class="q-detail-icon" style="background:${m.bg}">${m.icon}</div>
+    <div>
+      <div class="q-detail-name" style="color:${m.color}">${m.name}</div>
+      <div class="q-detail-sub">${m.sub}</div>
+    </div>`;
+
+  const c = document.getElementById('detail-tasks');
+  c.innerHTML = '';
+
+  if(!tasks[q].length) {
+    c.innerHTML = `<div class="empty-state">
+      <div class="empty-state-icon">${m.icon}</div>
+      <div class="empty-state-text">No tasks here yet</div>
+    </div>`;
+    return;
+  }
+
+  tasks[q].forEach(t => {
+    const el = document.createElement('div');
+    el.className = 'task-item' + (t.done ? ' done' : '');
+    el.innerHTML = `
+      <div class="check-ring ${t.done?'checked':''}" onclick="toggleDone('${q}','${t.id}')">
+        <svg viewBox="0 0 12 12" fill="none" stroke="${m.color}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="2,6 5,9 10,3"/>
+        </svg>
+      </div>
+      <span class="task-item-text">${esc(t.text)}</span>
+      <button class="task-del-btn" onclick="removeTask('${q}','${t.id}')">×</button>`;
+    c.appendChild(el);
+  });
+}
+
+/* ── ACTIONS ── */
+function toggleDone(q, id) {
+  const t = tasks[q].find(x=>x.id===id);
+  if(t) { t.done=!t.done; save(); renderDetail(q); renderOverview(); updateStats(); }
+}
+
+function removeTask(q, id) {
+  tasks[q] = tasks[q].filter(x=>x.id!==id);
+  save(); renderDetail(q); renderOverview(); updateStats();
+  showToast('Task removed');
+}
+
+function updateStats() {
+  const all = Object.values(tasks).flat();
+  document.getElementById('s-total').textContent = all.length;
+  document.getElementById('s-done').textContent = all.filter(t=>t.done).length;
+  document.getElementById('s-do').textContent = tasks.q1.length;
+}
+
+function showToast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg; el.classList.add('show');
+  clearTimeout(el._t);
+  el._t = setTimeout(()=>el.classList.remove('show'), 2000);
+}
+
+function esc(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+document.getElementById('task-input').addEventListener('keydown', e => {
+  if(e.key==='Enter') addTask();
+});
+
+load();
+</script>
+</body>
+</html>
